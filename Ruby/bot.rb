@@ -62,13 +62,13 @@ class Jibril < Discordrb::Commands::CommandBot
       :permission_level => 10,
       &method(:command_restart)
     )
-    self.command(:roles) { |e|
-      e.respond "Server roles:"
-      e.server.roles.each { |r|
-        e.respond "#{r.name} (#{r.id})"
-      }
-      e.respond e.server.default_role.name
-    }
+    self.command(
+      :selfupdate,
+      :max_args => 0,
+      :usage => "!selfupdate",
+      :permission_level => 10,
+      &method(:command_selfupdate)
+    )
     #Do setup after connection to server is complete
     self.ready {
       @config['authentication']['admins'].each { |entry|
@@ -104,6 +104,11 @@ class Jibril < Discordrb::Commands::CommandBot
       self.prepare
       event.respond "Done! :heart:"
     end
+  end
+
+  def command_selfupdate(event)
+    exec("git pull")
+    self.command_restart(event)
   end
 end
 

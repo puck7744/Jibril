@@ -37,6 +37,7 @@ class Jibril < Discordrb::Commands::CommandBot
     #Register all of the bot's available commands; note that method() is used to
     #pass instance methods as blocks for these definitions
     self.command(:goto, :min_args => 1, :max_args => 1, :usage => "!goto <location>", &method(:command_goto))
+    self.command(:restart, :min_args => 0, :max_args => 1, :usage => "!restart <hard reload?>", &method(:command_restart))
   end
 
   def finalize()
@@ -50,6 +51,21 @@ class Jibril < Discordrb::Commands::CommandBot
     #Create a Location object and add it to our list of tracked locations
     @locations.push(Location.new(event.server, channelname, rolename))
     event.respond "Done! Head on over to ##{channelname}"
+  end
+
+  def command_restart(event, *args)
+    is_hard = args[0] =~ /y|yes|1|true|hard/
+    event.respond "BRB!"
+    self.finalize()
+    if is_hard
+      exec([ File.absolute_path(__FILE__), __FILE__ ], *ARGV)
+    else
+      $soft_reset = true
+      self.commands.each_value { |c| self.remove_command(c.name) }
+      require(__FILE__)
+      self.prep_commands
+      event.respond "<3"
+    end
   end
 end
 

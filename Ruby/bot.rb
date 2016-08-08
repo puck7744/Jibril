@@ -18,6 +18,13 @@ class Location
   end
 end
 
+#Patch method for Server to get the default role
+class Discordrb::Server
+  def default_role
+    self.role(@id)
+  end
+end
+
 class Jibril < Discordrb::Commands::CommandBot
   def initialize()
     @config = YAML.load_file('config.yaml') #Load a simple configuration file
@@ -30,18 +37,46 @@ class Jibril < Discordrb::Commands::CommandBot
       prefix: @config['commands']['prefix']
     )
 
-    self.prep_commands
+    self.prepare
   end
 
-  def prep_commands()
+  def prepare()
     #Register all of the bot's available commands; note that method() is used to
     #pass instance methods as blocks for these definitions
-    self.command(:goto, :min_args => 1, :max_args => 1, :usage => "!goto <location>", &method(:command_goto))
-    self.command(:restart, :min_args => 0, :max_args => 1, :usage => "!restart <hard reload?>", &method(:command_restart))
+    self.command(
+      :goto,
+      :min_args => 1,
+      :max_args => 1,
+      :usage => "!goto <location>",
+      &method(:command_goto)
+    )
+    self.command(
+      :reload,
+      :min_args => 0,
+      :max_args => 1,
+      :usage => "!reload [hard?]",
+      :permission_level => 10,
+      &method(:command_restart)
+    )
+    self.command(:roles) { |e|
+      e.respond "Server roles:"
+      e.server.roles.each { |r|
+        e.respond "#{r.name} (#{r.id})"
+      }
+      e.respond e.server.default_role.name
+    }
+    #Do setup after connection to server is complete
+    self.ready {
+      @config['authentication']['admins'].each { |entry|
+        self.set_user_permission(entry, 10)
+        self.users[entry].pm("Jibril bot is now online") if self.users[entry]
+      }
+    }
   end
 
   def finalize()
     @locations.map!(&:finalize) #Call finalize on all locations
+    @locations = Array.new
   end
 
   def command_goto(event, name)
@@ -55,7 +90,6 @@ class Jibril < Discordrb::Commands::CommandBot
 
   def command_restart(event, *args)
     is_hard = args[0] =~ /y|yes|1|true|hard/
-    event.respond "BRB!"
     self.finalize()
     if is_hard
       exec("ruby #{__FILE__}", *ARGV)
@@ -63,8 +97,8 @@ class Jibril < Discordrb::Commands::CommandBot
       $soft_reset = true
       self.commands.each_value { |c| self.remove_command(c.name) }
       load __FILE__
-      self.prep_commands
-      event.respond ":heart:"
+      self.prepare
+      event.respond "Done! :heart:"
     end
   end
 end

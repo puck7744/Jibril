@@ -2,34 +2,51 @@
 require 'discordrb'
 require 'yaml'
 
-class Location
-  attr_reader :server, :channel, :role
-  def initialize(server, name, role)
-    #Create a custom channel and a role to view it
-    @server = server
-
-    @role = @server.create_role()
-    @role.name = role
-
-    @channel = @server.create_channel(name)
-    @channel.define_overwrite(@server.default_role, 0, 9007199254740991) #No permissions
-    @channel.define_overwrite(@role.id, 67177472, 0)#Basic permissions
-  end
-
-  def finalize()
-    @channel.delete
-    @role.delete
+#Monkey patch Process because why not
+module Process
+  def self.reload()
+    exec("ruby #{__FILE__}", *ARGV)
   end
 end
 
-#Patch method for Server to get the default role
+#Patch method to match default_channel
 class Discordrb::Server
   def default_role
     self.role(@id)
   end
 end
 
+#Holds information about the
+class Location
+  attr_reader :server, :channel, :role
+  def initialize(server, name, role)
+    begin
+      #Create a custom channel and a role to view it
+      @server = server
+      @channel = @server.create_channel(name)
+      @role = @server.create_role()
+      @role.name = role
+      @role.permissions = 0
+
+      @channel.define_overwrite(@server.default_role, 0, 9007199254740991) #No permissions
+      @channel.define_overwrite(@role.id, 67177472, 0)#Basic permissions
+    rescue
+      self.finalize()
+      raise
+    end
+  end
+
+  def finalize()
+    @channel.delete if @channel
+    @role.delete if @role
+    @@running = false
+  end
+end
+
 class Jibril < Discordrb::Commands::CommandBot
+  @@running = false
+  class << self; attr_accessor :running; end
+
   def initialize()
     @config = YAML.load_file('config.yaml') #Load a simple configuration file
     @locations = Array.new #Remember channels and roles we've created
@@ -42,6 +59,7 @@ class Jibril < Discordrb::Commands::CommandBot
     )
 
     self.prepare
+    @@running = true
   end
 
   def prepare()
@@ -87,22 +105,29 @@ class Jibril < Discordrb::Commands::CommandBot
     channelname = "#{@config['commands']['goto']['prefix']}#{name}"
     rolename = "Roleplaying in #{name}"
 
-    #Create a Location object and add it to our list of tracked locations
-    @locations.push(Location.new(event.server, channelname, rolename))
-    event.respond "Done! Head on over to ##{channelname}"
+    begin
+      #Create a Location object and add it to our list of tracked locations
+      @locations.push(Location.new(event.server, channelname, rolename))
+      event.respond "Done! Head on over to ##{channelname}"
+    rescue
+      event.respond "Sorry, I couldn't create the location for you."
+    end
   end
 
   def command_restart(event, *args)
-    is_hard = args[0] =~ /y|yes|1|true|hard/
-    self.finalize()
-    if is_hard
-      exec("ruby #{__FILE__}", *ARGV)
-    else
-      $soft_reset = true
-      self.commands.each_value { |c| self.remove_command(c.name) }
-      load __FILE__
-      self.prepare
-      event.respond "Done! :heart:"
+    begin
+      is_hard = args[0] =~ /y|yes|1|true|hard/
+      self.finalize()
+      if is_hard
+        Process.reload
+      else
+        self.commands.each_value { |c| self.remove_command(c.name) }
+        load __FILE__
+        self.prepare
+        event.respond "Done! :heart:" if event
+      end
+    rescue
+      Process.reload #Fall back to hard reset
     end
   end
 
@@ -112,4 +137,11 @@ class Jibril < Discordrb::Commands::CommandBot
   end
 end
 
-Jibril.new.run unless $soft_reset
+begin
+  instance = Jibril.new
+  instance.run unless Jibril.running
+rescue Exception => e
+  puts e.message
+  (instance.finalize) rescue nil;
+  Process.reload
+end

@@ -58,13 +58,13 @@ class Jibril < Discordrb::Commands::CommandBot
     event.respond "BRB!"
     self.finalize()
     if is_hard
-      exec([ File.absolute_path(__FILE__), __FILE__ ], *ARGV)
+      exec("ruby #{__FILE__}", *ARGV)
     else
       $soft_reset = true
       self.commands.each_value { |c| self.remove_command(c.name) }
-      require(__FILE__)
+      load __FILE__
       self.prep_commands
-      event.respond "<3"
+      event.respond ":heart:"
     end
   end
 end

@@ -1,48 +1,3 @@
-#!/usr/local/bin/ruby
-require 'discordrb'
-require 'yaml'
-
-#Monkey patch Process because why not
-module Process
-  def self.reload()
-    exec("ruby #{__FILE__}", *ARGV)
-  end
-end
-
-#Patch method to match default_channel
-class Discordrb::Server
-  def default_role
-    self.role(@id)
-  end
-end
-
-#Holds information about the
-class Location
-  attr_reader :server, :channel, :role
-  def initialize(server, name, role)
-    begin
-      #Create a custom channel and a role to view it
-      @server = server
-      @channel = @server.create_channel(name)
-      @role = @server.create_role()
-      @role.name = role
-      @role.permissions = 0
-
-      @channel.define_overwrite(@server.default_role, 0, 9007199254740991) #No permissions
-      @channel.define_overwrite(@role.id, 67177472, 0)#Basic permissions
-    rescue
-      self.finalize()
-      raise
-    end
-  end
-
-  def finalize()
-    @channel.delete if @channel
-    @role.delete if @role
-    @@running = false
-  end
-end
-
 class Jibril < Discordrb::Commands::CommandBot
   @@running = false
   class << self; attr_accessor :running; end
@@ -135,13 +90,4 @@ class Jibril < Discordrb::Commands::CommandBot
     exec("git pull")
     self.command_restart(event)
   end
-end
-
-begin
-  instance = Jibril.new
-  instance.run unless Jibril.running
-rescue Exception => e
-  puts e.message
-  (instance.finalize) rescue nil;
-  Process.reload
 end

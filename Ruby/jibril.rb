@@ -2,13 +2,16 @@
 require 'discordrb'
 require 'yaml'
 
-Dir["src/*.rb"].each {|file| require file }
+Dir["src/*.rb"].each {|file| load file }
 
-begin
-  instance = Jibril.new
-  instance.run unless Jibril.running
-rescue Exception => e
-  puts e.message
-  (instance.finalize) rescue nil;
-  Process.reload
+if !Jibril.running
+  begin
+    instance = Jibril.new
+    Signal.trap('INT') { instance.finalize(); exit }
+    instance.run
+  rescue Exception => e
+    puts e.message
+    (instance.finalize) rescue nil; #Suppress errors because of a shortcoming in discordrb
+    Process.reload
+  end
 end

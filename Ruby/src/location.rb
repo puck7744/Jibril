@@ -12,7 +12,8 @@ class Location
 
       @channel.define_overwrite(@server.default_role, 0, 9007199254740991) #No permissions
       @channel.define_overwrite(@role.id, 67177472, 0)#Basic permissions
-    rescue
+    rescue Exception => e
+      puts e.message
       self.finalize()
       raise
     end

@@ -1,8 +1,10 @@
 class Jibril < Discordrb::Commands::CommandBot
-  @@running = false
-  class << self; attr_accessor :running; end
+  def self.running
+    return $botrunning||false
+  end
 
   def initialize()
+    puts "Initializing..."
     @config = YAML.load_file('config.yaml') #Load a simple configuration file
     @locations = Array.new #Remember channels and roles we've created
 
@@ -14,7 +16,7 @@ class Jibril < Discordrb::Commands::CommandBot
     )
 
     self.prepare
-    @@running = true
+    $botrunning = true
   end
 
   def prepare()
@@ -33,7 +35,7 @@ class Jibril < Discordrb::Commands::CommandBot
       :max_args => 1,
       :usage => "!reload [hard?]",
       :permission_level => 10,
-      &method(:command_restart)
+      &method(:command_reload)
     )
     self.command(
       :selfupdate,
@@ -52,8 +54,9 @@ class Jibril < Discordrb::Commands::CommandBot
   end
 
   def finalize()
+    puts "Cleaning up"
     @locations.map!(&:finalize) #Call finalize on all locations
-    @locations = Array.new
+    @locations = Array.new #Makes all old instances eligible for GC
   end
 
   def command_goto(event, name)
@@ -69,7 +72,7 @@ class Jibril < Discordrb::Commands::CommandBot
     end
   end
 
-  def command_restart(event, *args)
+  def command_reload(event, *args)
     begin
       is_hard = args[0] =~ /y|yes|1|true|hard/
       self.finalize()
@@ -77,7 +80,7 @@ class Jibril < Discordrb::Commands::CommandBot
         Process.reload
       else
         self.commands.each_value { |c| self.remove_command(c.name) }
-        load __FILE__
+        load $0
         self.prepare
         event.respond "Done! :heart:" if event
       end

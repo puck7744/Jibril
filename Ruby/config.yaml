@@ -1,9 +1,0 @@
-authentication:
-  appid: 212058450094587905
-  token: 'MjEyMDU4NDUwMDk0NTg3OTA1.ComYLw.S-0JhZzd4HO6_32v2HDPKHsWW84'
-  admins:
-    - 134743564050497536
-commands:
-  prefix: '!'
-  goto:
-    prefix: 'roleplay-'

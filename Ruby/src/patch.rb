@@ -21,8 +21,17 @@ class Discordrb::Server
   end
 end
 
+#Allow the setting of permission bits directly
 class Discordrb::Role
   def permissions=(p)
     self.packed = p #FIXME: This method is technically internal and may change
+  end
+end
+
+#FIXME: This patch fixes an issue where event.name is used internally when it should be event.role.name
+#       Remove when this issue is patched.
+class Discordrb::Events::ServerRoleCreateEvent
+  def name
+    return @role.name
   end
 end

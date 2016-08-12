@@ -20,14 +20,30 @@ class Jibril < Discordrb::Commands::CommandBot
   end
 
   def prepare()
+    puts "Defining commands..."
+
     #Register all of the bot's available commands; note that method() is used to
     #pass instance methods as blocks for these definitions
     self.command(
-      :goto,
+      :open,
       :min_args => 1,
       :max_args => 1,
-      :usage => "!goto <location>",
-      &method(:command_goto)
+      :usage => "!open <name>",
+      &method(:command_open)
+    )
+    self.command(
+      :join,
+      :min_args => 1,
+      :max_args => 1,
+      :usage => "!join <name>",
+      &method(:command_join)
+    )
+    self.command(
+      :close,
+      :min_args => 1,
+      :max_args => 1,
+      :usage => "!close <name>",
+      &method(:command_close)
     )
     self.command(
       :reload,
@@ -44,6 +60,7 @@ class Jibril < Discordrb::Commands::CommandBot
       :permission_level => 10,
       &method(:command_selfupdate)
     )
+
     #Do setup after connection to server is complete
     self.ready {
       @config['authentication']['admins'].each { |id|
@@ -67,23 +84,48 @@ class Jibril < Discordrb::Commands::CommandBot
       @config['authentication']['admins'].each { |id|
         self.users[id].pm(message) if self.users[id]
       }
-    rescue Exception => e
-      puts "Failed to send admin message: #{e.message} (#{e.backtrace[0]})"
+    rescue
+      puts "Failed to send admin message: #{$!.message} (#{$!.backtrace[0]})"
     end
   end
 
-  def command_goto(event, name)
-    channelname = "#{@config['commands']['goto']['prefix']}#{name}"
+  def command_open(event, name)
+    channelname = "#{@config['commands']['open']['prefix']}#{name.downcase}"
     rolename = "Roleplaying in #{name}"
 
     begin
-      #Create a Location object and add it to our list of tracked locations
-      @locations.push(Location.new(event.server, channelname, rolename))
-      event.respond "Done! Head on over to ##{channelname}"
-    rescue Exception => e
-      event.respond "Sorry, I couldn't create the location for you."
-      message_admin "Failed to create location: #{e.message} (#{e.backtrace[0]})"
+      event.message.delete
+      newlocation = Location.new(event.server, channelname, rolename) {
+        puts "Yield"
+        event.user.on(event.server).add_role(newlocation.role)
+        event.respond "#{newlocation.channel.mention} is now open"
+      }
+      @locations.push(newlocation)
+      nil
+    rescue
+      @locations.delete newlocation if newlocation
+      event.respond "Sorry, I couldn't create '#{name}'"
+      raise $!, "Failed to create location: #{$!}", $!.backtrace
     end
+  end
+
+  def command_join(event, name)
+    matches = @locations.collect { |l| l.channel.name =~ /#{@config['commands']['open']['prefix']}#{name}/ ? l : nil }
+    return "Could not find that location!" if matches.length < 1
+    return "Found multiple locations matching that name, please be more specific!" if matches.length > 1
+    event.user.on(event.server).add_role(matches[0].role)
+    event.message.delete
+    return "#{event.user.name} joined #{matches[0].channel.mention}"
+  end
+
+  def command_close(event, name)
+    matches = @locations.collect { |l| l.channel.name =~ /#{@config['commands']['open']['prefix']}#{name}/ ? l : nil }
+    return "Could not find that location!" if matches.length < 1
+    return "Found multiple locations matching that name, please be more specific!" if matches.length > 1
+    @locations.delete(matches[0])
+    matches[0].finalize()
+    event.message.delete
+    return "##{matches[0].channel.name} is now closed"
   end
 
   def command_reload(event, *args)
@@ -107,8 +149,8 @@ class Jibril < Discordrb::Commands::CommandBot
     begin
       exec("git pull --ff-only")
       self.command_restart(event, 'hard')
-    rescue Exception => e
-      message_admin "Failed to self update! #{e.message} (#{e.backtrace[0]})"
+    rescue
+      raise $!, "Failed to self update: #{$!}", $!.backtrace
     end
   end
 
@@ -122,8 +164,8 @@ class Jibril < Discordrb::Commands::CommandBot
         yield *args #Proceed as normal, passing along any parameters
       rescue Exception => e
         #Something went horribly wrong
-        message_admin("Performing an automatic reload due to an internal error: `#{e.message.gsub('`', "'")} (#{e.backtrace[0].gsub('`', "'")})`")
-        command_reload(args[0], 'hard');
+        message_admin("Internal error: `#{e.message.gsub('`', "'")} (#{e.backtrace[0].gsub('`', "'")})`")
+        return "Sorry, something went wrong"
       end
     }
   end

@@ -21,7 +21,7 @@ class Discordrb::Server
   end
 end
 
-#Allow the setting of permission bits directly
+#Allow the setting of permission bits directly (https://github.com/meew0/discordrb/issues/177)
 class Discordrb::Role
   def permissions=(p)
     self.packed = p #FIXME: This method is technically internal and may change

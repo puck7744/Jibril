@@ -5,5 +5,5 @@ authentication:
     - 134743564050497536
 commands:
   prefix: '!'
-  goto:
+  open:
     prefix: 'roleplay-'

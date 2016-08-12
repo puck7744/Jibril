@@ -112,8 +112,9 @@ class Jibril < Discordrb::Commands::CommandBot
     end
   end
 
-  #Alias the old method so we can reference it below. respond_to? ensures we don't alias our alias
-  (alias_method :default_command, :command) unless respond_to? :default_command
+  #Alias the old method so we can reference it below.
+  #Unless ensures we don't alias our alias on hot reload and cause stack overflow
+  (alias_method :default_command, :command) unless Jibril.instance_methods.include? :default_command
   def command(name, attributes, &block)
     #Overload the command method to wrap each block in a safety net
     default_command(name, attributes) { |*args| #Capture any command parameters

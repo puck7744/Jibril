@@ -104,8 +104,14 @@ class Jibril < Discordrb::Commands::CommandBot
   end
 
   def command_selfupdate(event)
-    exec("git pull")
-    self.command_restart(event)
+    begin
+      exec("git pull --ff-only")
+      self.command_restart(event, 'hard')
+    rescue Exception => e
+      message_admin "Failed to self update! #{e.message} (#{e.backtrace[0]})"
+    end
+  end
+
   #Alias the old method so we can reference it below. respond_to? ensures we don't alias our alias
   (alias_method :default_command, :command) unless respond_to? :default_command
   def command(name, attributes, &block)

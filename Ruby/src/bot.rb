@@ -46,9 +46,9 @@ class Jibril < Discordrb::Commands::CommandBot
     )
     #Do setup after connection to server is complete
     self.ready {
-      @config['authentication']['admins'].each { |entry|
-        self.set_user_permission(entry, 10)
-        self.users[entry].pm("Jibril bot is now online") if self.users[entry]
+      @config['authentication']['admins'].each { |id|
+        self.set_user_permission(id, 10)
+        self.users[id].pm("Jibril bot is now online") if self.users[id]
       }
     }
   end
@@ -59,6 +59,19 @@ class Jibril < Discordrb::Commands::CommandBot
     @locations = Array.new #Makes all old instances eligible for GC
   end
 
+  protected
+
+  def message_admin(message)
+    begin
+      puts "--admin-- #{message}"
+      @config['authentication']['admins'].each { |id|
+        self.users[id].pm(message) if self.users[id]
+      }
+    rescue Exception => e
+      puts "Failed to send admin message: #{e.message} (#{e.backtrace[0]})"
+    end
+  end
+
   def command_goto(event, name)
     channelname = "#{@config['commands']['goto']['prefix']}#{name}"
     rolename = "Roleplaying in #{name}"
@@ -67,8 +80,9 @@ class Jibril < Discordrb::Commands::CommandBot
       #Create a Location object and add it to our list of tracked locations
       @locations.push(Location.new(event.server, channelname, rolename))
       event.respond "Done! Head on over to ##{channelname}"
-    rescue
+    rescue Exception => e
       event.respond "Sorry, I couldn't create the location for you."
+      message_admin "Failed to create location: #{e.message} (#{e.backtrace[0]})"
     end
   end
 
@@ -92,5 +106,18 @@ class Jibril < Discordrb::Commands::CommandBot
   def command_selfupdate(event)
     exec("git pull")
     self.command_restart(event)
+  #Alias the old method so we can reference it below. respond_to? ensures we don't alias our alias
+  (alias_method :default_command, :command) unless respond_to? :default_command
+  def command(name, attributes, &block)
+    #Overload the command method to wrap each block in a safety net
+    default_command(name, attributes) { |*args| #Capture any command parameters
+      begin
+        yield *args #Proceed as normal, passing along any parameters
+      rescue Exception => e
+        #Something went horribly wrong
+        message_admin("Performing an automatic reload due to an internal error: `#{e.message.gsub('`', "'")} (#{e.backtrace[0].gsub('`', "'")})`")
+        command_reload(args[0], 'hard');
+      end
+    }
   end
 end

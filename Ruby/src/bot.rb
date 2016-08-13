@@ -92,6 +92,7 @@ class Jibril < Discordrb::Commands::CommandBot
   def command_open(event, name)
     channelname = "#{@config['commands']['open']['prefix']}#{name.downcase}"
     rolename = "Roleplaying in #{name}"
+    return "Name is too long!" if name.length > 8
 
     begin
       event.message.delete

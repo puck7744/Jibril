@@ -158,7 +158,7 @@ class Jibril < Discordrb::Commands::CommandBot
   #Alias the old method so we can reference it below.
   #Unless ensures we don't alias our alias on hot reload and cause stack overflow
   (alias_method :default_command, :command) unless Jibril.instance_methods.include? :default_command
-  def command(name, attributes, &block)
+  def command(name, attributes = {}, &block)
     #Overload the command method to wrap each block in a safety net
     default_command(name, attributes) { |*args| #Capture any command parameters
       begin

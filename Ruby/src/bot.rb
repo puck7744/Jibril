@@ -1,5 +1,5 @@
 class Jibril < Discordrb::Commands::CommandBot
-  def version; "1.0.0"; end
+  def version; "1.0.1"; end
 
   def self.running
     return $botrunning||false
@@ -14,7 +14,8 @@ class Jibril < Discordrb::Commands::CommandBot
     super(
       application_id: @config['authentication']['appid'],
       token: @config['authentication']['token'],
-      prefix: @config['commands']['prefix']
+      prefix: @config['commands']['prefix'],
+      debug: true
     )
 
     self.prepare
@@ -26,38 +27,42 @@ class Jibril < Discordrb::Commands::CommandBot
 
     #Register all of the bot's available commands; note that method() is used to
     #pass instance methods as blocks for these definitions
-    self.command(
-      :open,
-      :min_args => 1,
-      :max_args => 1,
-      :usage => "#{@config['commands']['open']['prefix']}open <name>",
-      &method(:command_open)
-    )
-    self.command(
-      :join,
-      :min_args => 1,
-      :max_args => 1,
-      :usage => "#{@config['commands']['open']['prefix']}join <name>",
-      &method(:command_join)
-    )
-    self.command(
-      :close,
-      :min_args => 1,
-      :max_args => 1,
-      :usage => "#{@config['commands']['open']['prefix']}close <name>",
-      &method(:command_close)
-    )
+
+    #The following commands are disabled and may be removed in a future version
+    # self.command(
+    #   :open,
+    #   :min_args => 1,
+    #   :max_args => 1,
+    #   :usage => "#{@config['commands']['prefix']}open <name>",
+    #   &method(:command_open)
+    # )
+    # self.command(
+    #   :join,
+    #   :min_args => 1,
+    #   :max_args => 1,
+    #   :usage => "#{@config['commands']['prefix']}join <name>",
+    #   &method(:command_join)
+    # )
+    # self.command(
+    #   :close,
+    #   :min_args => 1,
+    #   :max_args => 1,
+    #   :usage => "#{@config['commands']['prefix']}close <name>",
+    #   &method(:command_close)
+    # )
     self.command(
       :reload,
       :min_args => 0,
       :max_args => 1,
-      :usage => "#{@config['commands']['open']['prefix']}reload [hard?]",
+      description: 'Reloads Jibril in memory (soft) or from disk (hard)',
+      :usage => "#{@config['commands']['prefix']}reload [hard?]",
       :permission_level => 10,
       &method(:command_reload)
     )
     self.command(
       :selfupdate,
-      :usage => "#{@config['commands']['open']['prefix']}selfupdate",
+      description: 'Updates Jibril to the latest version via Git.',
+      :usage => "#{@config['commands']['prefix']}selfupdate",
       :permission_level => 10,
       &method(:command_selfupdate)
     )

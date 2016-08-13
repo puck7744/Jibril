@@ -1,5 +1,5 @@
 class Jibril < Discordrb::Commands::CommandBot
-  def version; "1.0.1"; end
+  def version; "1.0.7"; end
 
   def self.running
     return $botrunning||false
@@ -9,13 +9,13 @@ class Jibril < Discordrb::Commands::CommandBot
     puts "Initializing..."
     @config = YAML.load_file('config.yaml') #Load a simple configuration file
     @locations = Array.new #Remember channels and roles we've created
+    @data = YAML::Store.new('data.yaml')
 
     #This method initializes the underlying CommandBot and Bot classes and connects to the server
     super(
       application_id: @config['authentication']['appid'],
       token: @config['authentication']['token'],
-      prefix: @config['commands']['prefix'],
-      debug: true
+      prefix: @config['commands']['prefix']
     )
 
     self.prepare
@@ -28,45 +28,41 @@ class Jibril < Discordrb::Commands::CommandBot
     #Register all of the bot's available commands; note that method() is used to
     #pass instance methods as blocks for these definitions
 
-    #The following commands are disabled and may be removed in a future version
-    # self.command(
-    #   :open,
-    #   :min_args => 1,
-    #   :max_args => 1,
-    #   :usage => "#{@config['commands']['prefix']}open <name>",
-    #   &method(:command_open)
-    # )
-    # self.command(
-    #   :join,
-    #   :min_args => 1,
-    #   :max_args => 1,
-    #   :usage => "#{@config['commands']['prefix']}join <name>",
-    #   &method(:command_join)
-    # )
-    # self.command(
-    #   :close,
-    #   :min_args => 1,
-    #   :max_args => 1,
-    #   :usage => "#{@config['commands']['prefix']}close <name>",
-    #   &method(:command_close)
-    # )
+    ### Roleplay Commands ###
+    self.command(
+      :rules,
+      max_args: 0,
+      description: 'Get a copy of the roleplaying rules delivered via DM',
+      usage: "#{@config['commands']['prefix']}rules",
+      &method(:command_rules)
+    )
+    self.command(
+      :setrules,
+      min_args: 1,
+      description: "Set the message for #{@config['commands']['prefix']}rules",
+      usage: "#{@config['commands']['prefix']}setrules",
+      &method(:command_setrules)
+    )
+
+    ### Meta Commands ###
     self.command(
       :reload,
-      :min_args => 0,
-      :max_args => 1,
+      min_args: 0,
+      max_args: 1,
       description: 'Reloads Jibril in memory (soft) or from disk (hard)',
-      :usage => "#{@config['commands']['prefix']}reload [hard?]",
-      :permission_level => 10,
+      usage: "#{@config['commands']['prefix']}reload [hard?]",
+      permission_level: 10,
       &method(:command_reload)
     )
     self.command(
       :selfupdate,
       description: 'Updates Jibril to the latest version via Git.',
-      :usage => "#{@config['commands']['prefix']}selfupdate",
-      :permission_level => 10,
+      usage: "#{@config['commands']['prefix']}selfupdate",
+      permission_level: 10,
       &method(:command_selfupdate)
     )
-    self.command(:version) { "Jibril bot version #{self.version}" }
+    self.command(:version, description: 'Outputs the currently running version of Jibril',
+    usage: "#{@config['commands']['prefix']}version") { "Jibril bot version #{self.version}" }
 
     #Do setup after connection to server is complete
     self.ready {
@@ -96,55 +92,13 @@ class Jibril < Discordrb::Commands::CommandBot
     end
   end
 
-  def command_open(event, name)
-    channelname = "#{@config['commands']['open']['prefix']}#{name.downcase}"
-    rolename = "Roleplaying in #{name}"
-
-    #Sanity checks
-    return "Name is too long!" if name.length > 8
-    return "Invalid name!" if name !~ /^[a-zA-Z0-9]+$/
-
-    begin
-      event.message.delete
-      newlocation = Location.new(event.server, channelname, rolename) {
-        event.user.on(event.server).add_role(newlocation.role)
-        event.respond "#{newlocation.channel.mention} is now open"
-      }
-      @locations.push(newlocation)
-      nil #Prevent Discordrb from sending a string representation of the object
-    rescue
-      @locations.delete newlocation if newlocation
-      event.respond "Sorry, I couldn't create '#{name}'"
-      raise $!, "Failed to create location: #{$!}", $!.backtrace #
-    end
+  def command_rules(event, *args)
+    @data.transaction { event.respond @data.fetch(:rules, "`No rules defined!`") }
   end
 
-  def custom_channel_op(name, &block)
-    #Get a list of locations with matching channel name
-    matches = @locations.collect { |l| l.channel.name =~ /#{@config['commands']['open']['prefix']}#{name}/ ? l : nil }
-
-    #Early outs
-    return "Could not find that location!" if matches.length < 1
-    return "Found multiple locations matching that name, please be more specific!" if matches.length > 1
-
-    return yield matches[0]
-  end
-
-  def command_join(event, name)
-    custom_channel_op(name) { |location|
-      event.user.on(event.server).add_role(location.role)
-      event.message.delete
-      return "#{event.user.name} joined #{location.channel.mention}"
-    }
-  end
-
-  def command_close(event, name)
-    custom_channel_op(name) { |location|
-      @locations.delete(location)
-      location.finalize()
-      event.message.delete
-      return "##{location.channel.name} is now closed"
-    }
+  def command_setrules(event, *args)
+    @data.transaction { @data[:rules] = args.join(' ').gsub('|', '\n') }
+    "Rules have been updated!"
   end
 
   def command_reload(event, *args)

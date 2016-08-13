@@ -1,6 +1,7 @@
 #!/usr/local/bin/ruby
 require 'discordrb'
 require 'yaml'
+require 'yaml/store'
 
 Dir["src/*.rb"].each {|file| load file }
 

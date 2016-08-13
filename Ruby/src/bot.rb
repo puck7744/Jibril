@@ -1,4 +1,6 @@
 class Jibril < Discordrb::Commands::CommandBot
+  def version; "1.0.0"; end
+
   def self.running
     return $botrunning||false
   end
@@ -28,38 +30,38 @@ class Jibril < Discordrb::Commands::CommandBot
       :open,
       :min_args => 1,
       :max_args => 1,
-      :usage => "!open <name>",
+      :usage => "#{@config['commands']['open']['prefix']}open <name>",
       &method(:command_open)
     )
     self.command(
       :join,
       :min_args => 1,
       :max_args => 1,
-      :usage => "!join <name>",
+      :usage => "#{@config['commands']['open']['prefix']}join <name>",
       &method(:command_join)
     )
     self.command(
       :close,
       :min_args => 1,
       :max_args => 1,
-      :usage => "!close <name>",
+      :usage => "#{@config['commands']['open']['prefix']}close <name>",
       &method(:command_close)
     )
     self.command(
       :reload,
       :min_args => 0,
       :max_args => 1,
-      :usage => "!reload [hard?]",
+      :usage => "#{@config['commands']['open']['prefix']}reload [hard?]",
       :permission_level => 10,
       &method(:command_reload)
     )
     self.command(
       :selfupdate,
-      :max_args => 0,
-      :usage => "!selfupdate",
+      :usage => "#{@config['commands']['open']['prefix']}selfupdate",
       :permission_level => 10,
       &method(:command_selfupdate)
     )
+    self.command(:version) { "Jibril bot version #{self.version}" }
 
     #Do setup after connection to server is complete
     self.ready {

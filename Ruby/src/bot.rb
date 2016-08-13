@@ -94,41 +94,52 @@ class Jibril < Discordrb::Commands::CommandBot
   def command_open(event, name)
     channelname = "#{@config['commands']['open']['prefix']}#{name.downcase}"
     rolename = "Roleplaying in #{name}"
+
+    #Sanity checks
     return "Name is too long!" if name.length > 8
+    return "Invalid name!" if name !~ /^[a-zA-Z0-9]+$/
 
     begin
       event.message.delete
       newlocation = Location.new(event.server, channelname, rolename) {
-        puts "Yield"
         event.user.on(event.server).add_role(newlocation.role)
         event.respond "#{newlocation.channel.mention} is now open"
       }
       @locations.push(newlocation)
-      nil
+      nil #Prevent Discordrb from sending a string representation of the object
     rescue
       @locations.delete newlocation if newlocation
       event.respond "Sorry, I couldn't create '#{name}'"
-      raise $!, "Failed to create location: #{$!}", $!.backtrace
+      raise $!, "Failed to create location: #{$!}", $!.backtrace #
     end
   end
 
-  def command_join(event, name)
+  def custom_channel_op(name, &block)
+    #Get a list of locations with matching channel name
     matches = @locations.collect { |l| l.channel.name =~ /#{@config['commands']['open']['prefix']}#{name}/ ? l : nil }
+
+    #Early outs
     return "Could not find that location!" if matches.length < 1
     return "Found multiple locations matching that name, please be more specific!" if matches.length > 1
-    event.user.on(event.server).add_role(matches[0].role)
-    event.message.delete
-    return "#{event.user.name} joined #{matches[0].channel.mention}"
+
+    return yield matches[0]
+  end
+
+  def command_join(event, name)
+    custom_channel_op(name) { |location|
+      event.user.on(event.server).add_role(location.role)
+      event.message.delete
+      return "#{event.user.name} joined #{location.channel.mention}"
+    }
   end
 
   def command_close(event, name)
-    matches = @locations.collect { |l| l.channel.name =~ /#{@config['commands']['open']['prefix']}#{name}/ ? l : nil }
-    return "Could not find that location!" if matches.length < 1
-    return "Found multiple locations matching that name, please be more specific!" if matches.length > 1
-    @locations.delete(matches[0])
-    matches[0].finalize()
-    event.message.delete
-    return "##{matches[0].channel.name} is now closed"
+    custom_channel_op(name) { |location|
+      @locations.delete(location)
+      location.finalize()
+      event.message.delete
+      return "##{location.channel.name} is now closed"
+    }
   end
 
   def command_reload(event, *args)
@@ -150,8 +161,8 @@ class Jibril < Discordrb::Commands::CommandBot
 
   def command_selfupdate(event)
     begin
-      exec("git pull --ff-only")
-      self.command_restart(event, 'hard')
+      exec("git pull --ff-only") #Pull but fast forward only
+      self.command_restart(event, 'hard') #Transform into a reload command
     rescue
       raise $!, "Failed to self update: #{$!}", $!.backtrace
     end

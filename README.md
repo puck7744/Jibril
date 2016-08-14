@@ -8,8 +8,7 @@ Current Commands
 |Name       |Parameters      |level  |Description|
 |-----------|----------------|-------|-----------|
 |version    |none            |any    |Replies with the version number|
-|open       |<name>          |any    |Creates a private channel and associated role|
-|join       |<name>          |any    |Enables chatting in the named private channel|
-|close      |<name>          |any    |Deletes the named private channel|
-|reload     |[hard?]         |admin  |Refreshes the running script, optionally by replacing the current process|
-|selfupdate |none            |admin  |Downloads the latest code from the git repository and reloads|
+|rules      |[public?]       |any    |Request a copy of the rules via DM by default, or publicly with the parameter set|
+|setrules   |<message>       |5      |Sets the rules messages to everything following the command. Newlines and formatting are accepted|
+|reload     |[hard?]         |10     |Refreshes the running script, optionally by replacing the current process|
+|selfupdate |none            |10     |Downloads the latest code from the git repository and reloads|

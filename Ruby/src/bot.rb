@@ -1,5 +1,5 @@
 class Jibril < Discordrb::Commands::CommandBot
-  def version; "1.0.7"; end
+  def version; "1.0.9"; end
 
   def self.running
     return $botrunning||false
@@ -31,16 +31,18 @@ class Jibril < Discordrb::Commands::CommandBot
     ### Roleplay Commands ###
     self.command(
       :rules,
-      max_args: 0,
+      min_args: 0,
+      max_args: 1,
       description: 'Get a copy of the roleplaying rules delivered via DM',
-      usage: "#{@config['commands']['prefix']}rules",
+      usage: "#{self.prefix}rules [public?]",
       &method(:command_rules)
     )
     self.command(
       :setrules,
       min_args: 1,
       description: "Set the message for #{@config['commands']['prefix']}rules",
-      usage: "#{@config['commands']['prefix']}setrules",
+      usage: "#{self.prefix}setrules <message>",
+      permission_level: 5,
       &method(:command_setrules)
     )
 
@@ -50,19 +52,19 @@ class Jibril < Discordrb::Commands::CommandBot
       min_args: 0,
       max_args: 1,
       description: 'Reloads Jibril in memory (soft) or from disk (hard)',
-      usage: "#{@config['commands']['prefix']}reload [hard?]",
+      usage: "#{self.prefix}reload [hard?]",
       permission_level: 10,
       &method(:command_reload)
     )
     self.command(
       :selfupdate,
       description: 'Updates Jibril to the latest version via Git.',
-      usage: "#{@config['commands']['prefix']}selfupdate",
+      usage: "#{self.prefix}selfupdate",
       permission_level: 10,
       &method(:command_selfupdate)
     )
     self.command(:version, description: 'Outputs the currently running version of Jibril',
-    usage: "#{@config['commands']['prefix']}version") { "Jibril bot version #{self.version}" }
+    usage: "#{self.prefix}version") { "Jibril bot version #{self.version}" }
 
     #Do setup after connection to server is complete
     self.ready {
@@ -93,17 +95,28 @@ class Jibril < Discordrb::Commands::CommandBot
   end
 
   def command_rules(event, *args)
-    @data.transaction { event.respond @data.fetch(:rules, "`No rules defined!`") }
+    viapm = args[0] !~ /y|yes|true|1|public/ || event.channel.private?
+    rulestext = String.new
+
+    @data.transaction {
+      (event.message.delete unless event.channel.private?) rescue nil;
+      rulestext = @data.fetch(:rules, "`No rules defined!`")
+    }
+
+    viapm ? event.user.pm(rulestext) : event.respond(rulestext)
   end
 
   def command_setrules(event, *args)
-    @data.transaction { @data[:rules] = args.join(' ').gsub('|', '\n') }
+    @data.transaction {
+      (event.message.delete unless event.channel.private?) rescue nil;
+      @data[:rules] = event.text.sub(/^#{self.prefix}#{event.command.name} /, '')
+    }
     "Rules have been updated!"
   end
 
   def command_reload(event, *args)
     begin
-      is_hard = args[0] =~ /y|yes|1|true|hard/
+      is_hard = args[0] =~ /y|yes|1|true|hard|full/
       self.finalize()
       if is_hard
         Process.reload

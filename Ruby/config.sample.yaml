@@ -1,10 +1,51 @@
-authentication:
+---
+:authentication:
   appid: 212058450094587905
-  token: 'MjEyMDU4NDUwMDk0NTg3OTA1.ComYLw.S-0JhZzd4HO6_32v2HDPKHsWW84'
-  admins:
-    - 134743564050497536
-commands:
-  prefix: '!'
-  roleplay:
-    channels:
-      - roleplay
+  token: <TOKEN HERE>
+  :levels:
+    moderator: 5
+    admin: 10
+  :users:
+    134743564050497536: 10
+:bot:
+  prefix: "jibril, "
+:commands:
+  ### Rule Commands ###
+  rules:
+    min_args: 0
+    max_args: 1
+    description: Get a copy of the roleplaying rules delivered via DM
+    usage: "%%rules [public?]"
+  setrules:
+      min_args: 1
+      description: "Set the message for %%rules"
+      usage: "%%setrules <message>"
+      permission_level: 5
+  ### Channel Commands ###
+  open:
+    min_args: => 1,
+    max_args: => 1,
+    usage: "%%open <name>"
+  join:
+    min_args: 1
+    max_args: 1
+    usage: "%%join <name>"
+  close:
+    min_args: 1
+    max_args: 1
+    usage: "%%close <name>"
+    permission_level: 10
+  ### Meta Commands ###
+  reload:
+    min_args: 0
+    max_args: 1
+    description: "Reloads Jibril in memory (soft) or from disk (hard)"
+    usage: "%%reload [hard?]"
+    permission_level: 10
+  selfupdate:
+      description: "Updates Jibril to the latest version via Git."
+      usage: "%%selfupdate"
+      permission_level: 10
+  version:
+    description: "Outputs the currently running version of Jibril"
+    usage: "%%version"

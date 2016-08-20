@@ -1,84 +1,59 @@
 class Jibril < Discordrb::Commands::CommandBot
-  def version; "1.0.9"; end
+  def version; "1.2.0"; end
 
-  def self.running
-    return $botrunning||false
+  def self.start()
+    @@instance = Jibril.new unless defined? @@instance
   end
 
   def initialize()
     puts "Initializing..."
-    @config = YAML.load_file('config.yaml') #Load a simple configuration file
+
+    @config = YAML::Store.new('config.yaml') #Load a simple configuration file
     @locations = Array.new #Remember channels and roles we've created
     @data = YAML::Store.new('data.yaml')
 
     #This method initializes the underlying CommandBot and Bot classes and connects to the server
-    super(
-      application_id: @config['authentication']['appid'],
-      token: @config['authentication']['token'],
-      prefix: @config['commands']['prefix']
-    )
+    @config.transaction {
+      super(
+        application_id: @config[:authentication]['appid'],
+        token: @config[:authentication]['token'],
+        prefix: @config[:bot]['prefix']
+      )
+    }
 
-    self.prepare
-    $botrunning = true
+    self.prepare()
+    self.run()
   end
 
   def prepare()
-    puts "Defining commands..."
-
     #Register all of the bot's available commands; note that method() is used to
     #pass instance methods as blocks for these definitions
+    puts "Loading commands..."
 
-    ### Roleplay Commands ###
-    self.command(
-      :rules,
-      min_args: 0,
-      max_args: 1,
-      description: 'Get a copy of the roleplaying rules delivered via DM',
-      usage: "#{self.prefix}rules [public?]",
-      &method(:command_rules)
-    )
-    self.command(
-      :setrules,
-      min_args: 1,
-      description: "Set the message for #{@config['commands']['prefix']}rules",
-      usage: "#{self.prefix}setrules <message>",
-      permission_level: 5,
-      &method(:command_setrules)
-    )
-
-    ### Meta Commands ###
-    self.command(
-      :reload,
-      min_args: 0,
-      max_args: 1,
-      description: 'Reloads Jibril in memory (soft) or from disk (hard)',
-      usage: "#{self.prefix}reload [hard?]",
-      permission_level: 10,
-      &method(:command_reload)
-    )
-    self.command(
-      :selfupdate,
-      description: 'Updates Jibril to the latest version via Git.',
-      usage: "#{self.prefix}selfupdate",
-      permission_level: 10,
-      &method(:command_selfupdate)
-    )
-    self.command(:version, description: 'Outputs the currently running version of Jibril',
-    usage: "#{self.prefix}version") { "Jibril bot version #{self.version}" }
+    @config.transaction {
+      @config[:commands].each { |name, value|
+        attributes = value.map { |k, v| [k.to_sym, v] }.to_h
+        self.command(
+          name.to_sym,
+          attributes,
+          &method("command_#{name}".to_sym)
+        )
+      }
+    }
 
     #Do setup after connection to server is complete
     self.ready {
-      @config['authentication']['admins'].each { |id|
-        self.set_user_permission(id, 10)
-        self.users[id].pm("Jibril bot is now online") if self.users[id]
-      }
+      self.load_users()
     }
   end
 
-  def finalize()
-    puts "Cleaning up"
-    @locations.map!(&:finalize) #Call finalize on all locations
-    @locations = Array.new #Makes all old instances eligible for GC
+  def load_users()
+    @config.transaction {
+      @config[:authentication][:users].each { |id, level|
+        self.set_user_permission(id, level)
+        self.users[id].pm("Jibril bot is now online") if self.users[id] && level >= @config[:authentication][:levels]['admin']
+      }
+    }
   end
 
   protected
@@ -86,57 +61,13 @@ class Jibril < Discordrb::Commands::CommandBot
   def message_admin(message)
     begin
       puts "--admin-- #{message}"
-      @config['authentication']['admins'].each { |id|
-        self.users[id].pm(message) if self.users[id]
+      @config.transaction {
+        @config[:authentication][:users].each { |id, level|
+          self.users[id].pm(message) if self.users[id] && level >= @config[:authentication][:levels]['admin']
+        }
       }
     rescue
       puts "Failed to send admin message: #{$!.message} (#{$!.backtrace[0]})"
-    end
-  end
-
-  def command_rules(event, *args)
-    viapm = args[0] !~ /y|yes|true|1|public/ || event.channel.private?
-    rulestext = String.new
-
-    @data.transaction {
-      (event.message.delete unless event.channel.private?) rescue nil;
-      rulestext = @data.fetch(:rules, "`No rules defined!`")
-    }
-
-    viapm ? event.user.pm(rulestext) : event.respond(rulestext)
-  end
-
-  def command_setrules(event, *args)
-    @data.transaction {
-      (event.message.delete unless event.channel.private?) rescue nil;
-      @data[:rules] = event.text.sub(/^#{self.prefix}#{event.command.name} /, '')
-    }
-    "Rules have been updated!"
-  end
-
-  def command_reload(event, *args)
-    begin
-      is_hard = args[0] =~ /y|yes|1|true|hard|full/
-      self.finalize()
-      if is_hard
-        Process.reload
-      else
-        self.commands.each_value { |c| self.remove_command(c.name) }
-        load $0
-        self.prepare
-        event.respond "Done! :heart:" if event
-      end
-    rescue
-      Process.reload #Fall back to hard reset
-    end
-  end
-
-  def command_selfupdate(event)
-    begin
-      exec("git pull --ff-only") #Pull but fast forward only
-      self.command_restart(event, 'hard') #Transform into a reload command
-    rescue
-      raise $!, "Failed to self update: #{$!}", $!.backtrace
     end
   end
 

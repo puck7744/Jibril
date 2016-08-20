@@ -1,5 +1,5 @@
 class Jibril < Discordrb::Commands::CommandBot
-  def version; "1.2.0"; end
+  def version; "1.2.1"; end
 
   def self.start()
     @@instance = Jibril.new unless defined? @@instance
@@ -21,6 +21,11 @@ class Jibril < Discordrb::Commands::CommandBot
       )
     }
 
+    #Do setup after connection to server is complete
+    self.ready {
+      self.load_users()
+    }
+
     self.prepare()
     self.run()
   end
@@ -39,11 +44,6 @@ class Jibril < Discordrb::Commands::CommandBot
           &method("command_#{name}".to_sym)
         )
       }
-    }
-
-    #Do setup after connection to server is complete
-    self.ready {
-      self.load_users()
     }
   end
 

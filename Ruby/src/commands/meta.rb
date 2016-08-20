@@ -8,7 +8,8 @@ class Jibril
       else
         self.commands.each_value { |c| self.remove_command(c.name) }
         load $0
-        self.prepare
+        self.load_users()
+        self.prepare()
         event.respond "Done! :heart:" if event
       end
     rescue
@@ -19,7 +20,7 @@ class Jibril
   def command_selfupdate(event)
     begin
       exec("git pull --ff-only") #Pull but fast forward only
-      self.command_restart(event, 'hard') #Transform into a reload command
+      self.command_reload(event, 'hard') #Transform into a reload command
     rescue
       raise $!, "Failed to self update: #{$!}", $!.backtrace
     end

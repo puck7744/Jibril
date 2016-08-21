@@ -1,57 +1,51 @@
-#Holds information about a channel and its associated role
-class Location
-  attr_reader :server, :channel, :role
-  def initialize(server, channelname, rolename, &block)
-    begin
-      #Create a custom channel and a role to view it
-      @server = server
-
-      #Listen for the channel to finish being created, then create a role for it
-      @server.await(:channelready, Discordrb::Events::ChannelCreateEvent, { :name => channelname}) {
-        @channel.define_overwrite(@server.default_role, 0, 9007199254740991) #No permissions, should make the channel invisible?
-        @role = @server.create_role()
-        @role.name = rolename
-        @role.permissions = 0
-      }
-      #Listen for the role to be created, then assign it to the channel
-      @server.await(:roleready, Discordrb::Events::ServerRoleCreateEvent, { :name => rolename }) {
-        @channel.define_overwrite(@role, 67177472, 0) #Minimal permissions
-        yield @channel, @role
-      }
-      @channel = @server.create_channel(channelname)
-    rescue Exception => e
-      self.finalize()
-      raise
-    end
-  end
-
-  def finalize()
-    #Make sure we don't leave any garbage
-    @channel.delete if @channel
-    @role.delete if @role
-  end
-end
-
 class Jibril
   protected
   def command_open(event, name)
-    channelname = "#{@config['commands']['open']['prefix']}#{name.downcase}"
-    rolename = "Roleplaying in #{name}"
-
-    #Sanity checks
-    return "Name is too long!" if name.length > 8
-    return "Invalid name!" if name !~ /^[a-zA-Z0-9]+$/
+    channelname = rolename = newchannel = newrole = nil
+    name.downcase!
+    @config.transaction {
+      channelname = (@config[:commands]['open']['channel']||'roleplay-%name%').gsub(/%name%/i, name)
+      rolename = (@config[:commands]['open']['role']||'Roleplaying in %name%').gsub(/%name%/i, name.capitalize)
+    }
+    @data.transaction {
+      #Initialize necessary data
+      @data['channel_count'] = 0 unless @data['channel_count']
+      @data[:channels] ||= {}
+      @data[:channels][event.server.id] ||= {}
+    }
 
     begin
-      event.message.delete
-      newlocation = Location.new(event.server, channelname, rolename) {
-        event.user.on(event.server).add_role(newlocation.role)
-        event.respond "#{newlocation.channel.mention} is now open"
+      #Sanity checks
+      return "Name is too long!" if name.length > 8
+      return "Invalid name!" if name !~ /^[a-zA-Z0-9]+$/
+      return "Too many channels active!" if @data.transaction { @data['channel_count'] > @config.transaction { @config[:commands]['open']['limit']||8 } }
+
+      (event.message.delete) rescue nil
+
+      #Listen for the channel to finish being created, then create a role for it
+      event.server.await(:channelready, Discordrb::Events::ChannelCreateEvent, { :name => channelname }) {
+        newchannel.define_overwrite(event.server.default_role, 0, 9007199254740991) #No permissions, should make the channel invisible?
+        newrole = event.server.create_role()
+        newrole.name = rolename
+        newrole.permissions = 0
       }
-      @locations.push(newlocation)
+      #Listen for the role to be created, then assign it to the channel
+      event.server.await(:roleready, Discordrb::Events::ServerRoleCreateEvent, { :name => rolename }) {
+        newchannel.define_overwrite(role, 67177472, 0) #Minimal permissions
+        @data.transaction {
+          @data[:channels][event.server.id][name] = {
+            'channel' => newchannel.id,
+            'role' => newrole.id
+          }
+          @data['channel_count'] += 1
+        }
+        event.respond "Done! Head on over to #{channel.mention}"
+      }
+      newchannel = event.server.create_channel(channelname) #create the channel
       nil #Prevent Discordrb from sending a string representation of the object
     rescue
-      @locations.delete newlocation if newlocation
+      newchannel.delete if newchannel
+      newrole.delete if newrole
       event.respond "Sorry, I couldn't create '#{name}'"
       raise $!, "Failed to create location: #{$!}", $!.backtrace #
     end
@@ -59,24 +53,30 @@ class Jibril
 
   def command_join(event, name)
     custom_channel_op(name) { |location|
-      event.user.on(event.server).add_role(location.role)
-      event.message.delete
-      return "#{event.user.name} joined #{location.channel.mention}"
+      event.user.on(event.server).add_role(location['role'])
+      "#{event.user.name} joined #{location['channel'].mention}"
     }
   end
 
   def command_close(event, name)
     custom_channel_op(name) { |location|
-      @locations.delete(location)
-      location.finalize()
-      event.message.delete
-      return "##{location.channel.name} is now closed"
+      location.channel.delete
+      location.role.delete
+      "##{location.channel.name} is now closed"
     }
   end
 
-  def custom_channel_op(name, &block)
+  def custom_channel_op(event, name, &block)
+    (event.message.delete) rescue nil
+
     #Get a list of locations with matching channel name
-    matches = @locations.collect { |l| l.channel.name =~ /#{@config['commands']['open']['prefix']}#{name}/ ? l : nil }
+    matches = @data.transaction {
+      return [] unless @data[:channels][event.server.id]
+      return @data[:channels][event.server.id].collect { |l|
+        return nil unless remote_chan = self.channel(l['channel'].to_i)
+        return remote_chan.name =~ /#{@config.transaction { @config[:commands]['open']['prefix'] }}#{name}/i ? { :channel => remote_chan, :role => self.role(l['role'].to_i) } : nil
+      }
+    }
 
     #Early outs
     return "Could not find that location!" if matches.length < 1

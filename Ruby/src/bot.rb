@@ -1,5 +1,5 @@
 class Jibril < Discordrb::Commands::CommandBot
-  def version; "1.2.3"; end
+  def version; "1.2.5"; end
 
   def initialize()
     puts "Initializing..."

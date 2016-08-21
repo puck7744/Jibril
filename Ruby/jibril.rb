@@ -5,4 +5,4 @@ require 'yaml/store'
 Dir["src/*.rb"].each {|file| load file }
 Dir["src/commands/*.rb"].each {|file| load file }
 
-Jibril.start
+Jibril.new.run()

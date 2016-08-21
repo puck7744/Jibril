@@ -1,9 +1,5 @@
 class Jibril < Discordrb::Commands::CommandBot
-  def version; "1.2.1"; end
-
-  def self.start()
-    @@instance = Jibril.new unless defined? @@instance
-  end
+  def version; "1.2.3"; end
 
   def initialize()
     puts "Initializing..."
@@ -73,7 +69,7 @@ class Jibril < Discordrb::Commands::CommandBot
         }
       }
     rescue
-      puts "Failed to send admin message: #{$!.message} (#{$!.backtrace[0]})"
+      puts "Failed to send admin message: #{$!.message} (#{$!.backtrace})"
     end
   end
 
@@ -87,7 +83,7 @@ class Jibril < Discordrb::Commands::CommandBot
         yield *args #Proceed as normal, passing along any parameters
       rescue Exception => e
         #Something went horribly wrong
-        message_admin("Internal error: `#{e.message.gsub('`', "'")} (#{e.backtrace[0].gsub('`', "'")})`")
+        message_admin("Internal error: `#{e.message.gsub('`', "'")} (#{e.backtrace.map{|n|n.gsub('`', "'")}}).join('\n')`")
         return "Sorry, something went wrong"
       end
     }

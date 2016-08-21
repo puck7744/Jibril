@@ -1,20 +1,6 @@
 class Jibril
   def command_reload(event, *args)
-    begin
-      is_hard = args[0] =~ /y|yes|1|true|hard|full/
-      self.finalize()
-      if is_hard
-        Process.reload
-      else
-        self.commands.each_value { |c| self.remove_command(c.name) }
-        load $0
-        self.load_users()
-        self.prepare()
-        event.respond "Done! :heart:" if event
-      end
-    rescue
-      Process.reload #Fall back to hard reset
-    end
+    Process.reload
   end
 
   def command_selfupdate(event)

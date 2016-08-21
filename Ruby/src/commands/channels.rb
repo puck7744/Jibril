@@ -9,7 +9,6 @@ class Jibril
     }
     @data.transaction {
       #Initialize necessary data
-      @data['channel_count'] = 0 unless @data['channel_count']
       @data[:channels] ||= {}
       @data[:channels][event.server.id] ||= {}
     }
@@ -18,7 +17,7 @@ class Jibril
       #Sanity checks
       return "Name is too long!" if name.length > 8
       return "Invalid name!" if name !~ /^[a-zA-Z0-9]+$/
-      return "Too many channels active!" if @data.transaction { @data['channel_count'] > @config.transaction { @config[:commands]['open']['limit']||8 } }
+      return "Too many channels active!" if @data.transaction { @data[:channels][event.server.id].length >= @config.transaction { @config[:commands]['open']['limit']||8 } }
 
       (event.message.delete) rescue nil
 
@@ -37,7 +36,6 @@ class Jibril
             'channel' => newchannel.id,
             'role' => newrole.id
           }
-          @data['channel_count'] += 1
         }
         event.respond "Done! Head on over to #{channel.mention}"
       }

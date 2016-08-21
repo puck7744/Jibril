@@ -17,14 +17,14 @@
     description: Get a copy of the roleplaying rules delivered via DM
     usage: "%%rules [public?]"
   setrules:
-      min_args: 1
-      description: "Set the message for %%rules"
-      usage: "%%setrules <message>"
-      permission_level: 5
+    min_args: 1
+    description: "Set the message for %%rules"
+    usage: "%%setrules <message>"
+    permission_level: 5
   ### Channel Commands ###
   open:
-    min_args: => 1,
-    max_args: => 1,
+    min_args: 1
+    max_args: 1
     usage: "%%open <name>"
   join:
     min_args: 1

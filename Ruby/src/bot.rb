@@ -37,7 +37,13 @@ class Jibril < Discordrb::Commands::CommandBot
 
     @config.transaction {
       @config[:commands].each { |name, value|
-        attributes = value.map { |k, v| [k.to_sym, v] }.to_h
+        attributes = value.map { |k, v|
+          case (k)
+            when /min_args|max_args|permission_level/
+              v = v.to_i
+          end
+          [k.to_sym, v]
+        }.to_h
         self.command(
           name.to_sym,
           attributes,
